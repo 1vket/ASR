@@ -12,12 +12,15 @@ class TransformerModel(nn.Module):
   def __init__(self, config):
     super().__init__()
 
+    self.config = config
+
     self.e_pos_emb = nn.Parameter(
       torch.zeros(1, config.block_size, config.n_mel))
     self.ln = nn.LayerNorm(config.n_mel)
     self.dense = nn.Linear(config.n_mel, config.d_model)
 
-    self.tok_emb = nn.Embedding(config.vocab_size, config.d_model)
+    self.tok_emb = nn.Embedding(
+      config.vocab_size, config.d_model, padding_idx=config.pad_idx)
     self.d_pos_emb = nn.Parameter(
       torch.zeros(1, config.block_size, config.d_model))
 
@@ -49,26 +52,30 @@ class TransformerModel(nn.Module):
     # encoder
     b, et, em = mfcc.size()
 
-    e_position_emb = self.e_position_emb[:, :et, :]
+    e_position_emb = self.e_pos_emb[:, :et, :]
     
-    ein = self.dense(self.ln(src + e_position_emb))
+    ein = self.dense(self.ln(mfcc + e_position_emb))
 
     # decoder
-    b, dt, v = src.size()
+    b, dt = src.size()
 
-    d_position_emb = self.d_position_emb[:, :dt, :]
+    d_position_emb = self.d_pos_emb[:, :dt, :]
 
     din = self.tok_emb(src) + d_position_emb
 
     # transformer
-    tgt_mask = self.generate_square_subsequent_mask(dt)
+    device = 'cpu'
+    if torch.cuda.is_available():
+      device = torch.cuda.current_device()
+    tgt_mask = nn.Transformer.generate_square_subsequent_mask(dt).to(device)
     out = self.transformer(ein, din, tgt_mask=tgt_mask)
 
     logits = self.out(out)
 
     loss = None
     if tgt is not None:
-      loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+      loss = F.cross_entropy(logits.view(-1, logits.size(-1)), tgt.view(-1),
+       ignore_index=self.config.pad_idx)
 
     return logits, loss
 
@@ -76,7 +83,9 @@ class TransformerModel(nn.Module):
     
     decay = set()
     no_decay = set()
-    whitelist_weight_modules = (torch.nn.Linear, )
+    whitelist_weight_modules = (
+      torch.nn.Linear, 
+    )
     blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
     for mn, m in self.named_modules():
       for pn, p in m.named_parameters():
@@ -88,6 +97,8 @@ class TransformerModel(nn.Module):
           decay.add(fpn)
         elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
           no_decay.add(fpn)
+        elif pn.endswith('in_proj_weight'):
+          decay.add(fpn)
 
     no_decay.add('e_pos_emb')
     no_decay.add('d_pos_emb')

@@ -27,7 +27,7 @@ def f(data_dir, tsv_filename):
 
       token = defect.text.sentence2phoneSymbol(sentence)
 
-      wf.write(data_dir+'mfcc/'+np_filename +'\t' + token)
+      wf.write(data_dir+'mfcc/'+np_filename+'\t'+' '.join(token)+'\n')
 
 if __name__ == "__main__":
   

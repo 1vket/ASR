@@ -1,0 +1,24 @@
+
+model:
+  d_model: 256
+  n_mel: 80
+  n_head: 8
+  n_layer: 8
+  vocab_size: 48
+  block_size: 512
+  pad_idx: 0
+
+train:
+  max_epochs: 100
+  batch_size: 8
+  learning_rate: 0.0003
+  betas: [0.9, 0.95]
+  grad_norm_clip: 1.0
+  weight_decay: 0.1
+  lr_decay: True
+  warmup_tokens: 2000000
+  final_tokens: 15000000
+
+  ckpt_path: "bestmodel"
+  num_workers: 0
+
