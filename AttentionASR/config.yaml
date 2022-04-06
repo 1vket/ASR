@@ -7,6 +7,9 @@ model:
   vocab_size: 48
   block_size: 512
   pad_idx: 0
+  sos_idx: 7
+  eos_idx: 3
+  max_loop: 400
 
 train:
   max_epochs: 100

@@ -122,6 +122,43 @@ class TransformerModel(nn.Module):
 
     return optimizer
 
+  def predict(self, mfcc, device='cpu'):
+    # encoder
+    b, et, em = mfcc.size()
+
+    e_position_emb = self.e_pos_emb[:, :et, :]
+    
+    ein = self.dense(self.ln(mfcc + e_position_emb))
+
+    # decoder
+    src = torch.LongTensor([[int(self.config.sos_idx)]]).to(device)
+
+    for i in range(int(self.config.max_loop)):
+      b, dt = src.size()
+
+      d_position_emb = self.d_pos_emb[:, :dt, :]
+
+      din = self.tok_emb(src) + d_position_emb
+
+      # transformer
+      tgt_mask = nn.Transformer.generate_square_subsequent_mask(dt).to(device)
+      out = self.transformer(ein, din, tgt_mask=tgt_mask)
+
+      logits = self.out(out)
+
+      _, next_token = torch.max(logits[:, -1], dim=-1)
+      src = torch.cat((src, next_token.view(1, 1)), dim=-1).to(device)
+
+      if next_token == int(self.config.eos_idx):
+        break
+
+    return src
+
+
+
+
+
+
 
 
 
